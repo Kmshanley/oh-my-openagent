@@ -16,7 +16,6 @@ const RETRYABLE_ERROR_NAMES = new Set([
 
 const STOP_ERROR_NAMES = new Set([
   "quotaexceedederror",
-  "insufficientcreditserror",
   "freeusagelimiterror",
 ])
 
@@ -105,7 +104,6 @@ const STOP_MESSAGE_PATTERNS = [
   "out of credits",
   "credits exhausted",
   "insufficient credits",
-  "insufficient balance",
   "credit balance",
   "usage limit for this month",
   "exhausted your capacity",

@@ -12,7 +12,7 @@ import type { RuntimeFallbackConfig } from "../../config"
  */
 export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   enabled: false,
-  retry_on_errors: [429, 500, 502, 503, 504],
+  retry_on_errors: [401, 429, 500, 502, 503, 504],
   max_fallback_attempts: 3,
   cooldown_seconds: 60,
   timeout_seconds: 30,

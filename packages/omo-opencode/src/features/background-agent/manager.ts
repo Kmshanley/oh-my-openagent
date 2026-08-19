@@ -2065,6 +2065,37 @@ The fallback retry session is now created and can be inspected directly.
       canRetry,
     })
 
+    // Deferred recovery check: runtime-fallback hook may recover the session
+    // asynchronously. Wait briefly and check for assistant output before
+    // marking the task as errored.
+    if (task.sessionId) {
+      await new Promise((resolve) => setTimeout(resolve, 5000))
+      try {
+        const response = await messagesInDirectory(this.client, {
+          path: { id: task.sessionId },
+        }, this.directory)
+        const msgArray = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string }; parts?: Array<{ type?: string; text?: string }> }>, { preferResponseOnMissingData: true })
+        if (msgArray.length > 0) {
+          const lastMsg = msgArray[msgArray.length - 1]
+          const hasAssistantContent =
+            lastMsg?.info?.role === "assistant" &&
+            lastMsg?.parts?.some((p) => p.type === "text" && (p.text ?? "").trim().length > 0)
+          if (hasAssistantContent) {
+            log("[background-agent] Session recovered after runtime-fallback retry, skipping error mark", {
+              taskId: task.id,
+              sessionID: task.sessionId,
+            })
+            return
+          }
+        }
+      } catch {
+        log("[background-agent] Failed to check session messages after error", {
+          taskId: task.id,
+          sessionID: task.sessionId,
+        })
+      }
+    }
+
     const sessionId = task.sessionId
     if (sessionId) {
       const sessionStillAlive = await this.verifySessionExists(sessionId)
