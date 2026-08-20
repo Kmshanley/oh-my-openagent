@@ -6,6 +6,7 @@ function modelConfig(config: ReturnType<typeof validatePluginConfig>["config"]):
     if (!agent || typeof agent !== "object") return []
     const entry = {
       ...(agent.model === undefined ? {} : { model: agent.model }),
+      ...(agent.models === undefined ? {} : { models: agent.models }),
       ...(agent.variant === undefined ? {} : { variant: agent.variant }),
       ...(agent.category === undefined ? {} : { category: agent.category }),
     }
@@ -15,6 +16,7 @@ function modelConfig(config: ReturnType<typeof validatePluginConfig>["config"]):
     if (!category || typeof category !== "object") return []
     const entry = {
       ...(category.model === undefined ? {} : { model: category.model }),
+      ...(category.models === undefined ? {} : { models: category.models }),
       ...(category.variant === undefined ? {} : { variant: category.variant }),
     }
     return Object.keys(entry).length === 0 ? [] : [[name, entry]]
