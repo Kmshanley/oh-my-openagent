@@ -6,7 +6,7 @@ import { AGENT_MODEL_REQUIREMENTS, isAnyFallbackModelAvailable } from "../../sha
 import { log } from "../../shared/logger"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyOverrides } from "./agent-overrides"
-import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
+import { applyModelResolution, getFirstFallbackModel, resolveOverrideModel } from "./model-resolution"
 import { createSisyphusAgent } from "../sisyphus"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 import { setSisyphusRuntimePromptContext } from "../sisyphus-runtime-prompt-reconciler"
@@ -44,41 +44,53 @@ export function maybeCreateSisyphusConfig(input: {
   } = input
 
   const sisyphusOverride = agentOverrides["sisyphus"]
-  const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
-  const hasSisyphusExplicitConfig = sisyphusOverride !== undefined
-  const meetsSisyphusAnyModelRequirement =
-    !sisyphusRequirement?.requiresAnyModel ||
-    hasSisyphusExplicitConfig ||
-    isFirstRunNoCache ||
-    isAnyFallbackModelAvailable(sisyphusRequirement.fallbackChain, availableModels)
+const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
+   const hasSisyphusExplicitConfig = sisyphusOverride !== undefined
+   const meetsSisyphusAnyModelRequirement =
+     !sisyphusRequirement?.requiresAnyModel ||
+     hasSisyphusExplicitConfig ||
+     isFirstRunNoCache ||
+     isAnyFallbackModelAvailable(sisyphusRequirement.fallbackChain, availableModels)
 
-  if (!disabledAgents.includes("sisyphus") && !meetsSisyphusAnyModelRequirement) {
-    log("[agent-registration] Agent skipped: no model in fallback chain is available", {
-      agent: "sisyphus",
-    })
-  }
-  if (disabledAgents.includes("sisyphus") || !meetsSisyphusAnyModelRequirement) return undefined
+   if (!disabledAgents.includes("sisyphus") && !meetsSisyphusAnyModelRequirement) {
+     log("[agent-registration] Agent skipped: no model in fallback chain is available", {
+       agent: "sisyphus",
+     })
+   }
+   if (disabledAgents.includes("sisyphus") || !meetsSisyphusAnyModelRequirement) return undefined
 
-  let sisyphusResolution = applyModelResolution({
-    uiSelectedModel: sisyphusOverride?.model !== undefined ? undefined : uiSelectedModel,
-    userModel: sisyphusOverride?.model,
-    requirement: sisyphusRequirement,
-    availableModels,
-    systemDefaultModel,
-  })
+   // v4.19.4 compatibility: resolve user-configured model from override, supporting
+   // both legacy single-model field and the new models array (models[0] is primary).
+   let overrideModel: string | undefined = undefined
+   if (sisyphusOverride?.model !== undefined) {
+     overrideModel = sisyphusOverride.model
+   } else {
+     const modelsArray = sisyphusOverride?.models
+     if (modelsArray && modelsArray.length > 0) {
+       const first = modelsArray[0]
+       overrideModel = typeof first === "string" ? first : first?.model
+     }
+   }
 
-  if (isFirstRunNoCache && !sisyphusOverride?.model && !uiSelectedModel) {
-    sisyphusResolution = getFirstFallbackModel(sisyphusRequirement)
-  }
+   let sisyphusResolution = applyModelResolution({
+     uiSelectedModel: overrideModel !== undefined ? undefined : uiSelectedModel,
+     userModel: overrideModel,
+     requirement: sisyphusRequirement,
+     availableModels,
+     systemDefaultModel,
+   })
+   if (isFirstRunNoCache && overrideModel === undefined && !uiSelectedModel) {
+     sisyphusResolution = getFirstFallbackModel(sisyphusRequirement)
+   }
 
-  if (!sisyphusResolution) {
-    log("[agent-registration] Agent skipped: model resolution returned no result", {
-      agent: "sisyphus",
-      configuredModel: sisyphusOverride?.model,
-    })
-    return undefined
-  }
-  const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
+   if (!sisyphusResolution) {
+     log("[agent-registration] Agent skipped: model resolution returned no result", {
+       agent: "sisyphus",
+       configuredModel: overrideModel,
+     })
+     return undefined
+   }
+   const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
 
   let sisyphusConfig = createSisyphusAgent(
     sisyphusModel,

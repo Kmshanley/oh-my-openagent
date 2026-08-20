@@ -76,22 +76,34 @@ export function collectPendingBuiltinAgents(input: {
 
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
+    // v4.19.4 compatibility: prefer models array, fall back to legacy model field
+    let overrideModel: string | undefined = undefined
+    if (override?.model !== undefined) {
+      overrideModel = override.model
+    } else {
+      const modelsArray = override?.models
+      if (modelsArray && modelsArray.length > 0) {
+        const first = modelsArray[0]
+        overrideModel = typeof first === "string" ? first : first?.model
+      }
+    }
+
     let resolution = applyModelResolution({
-      uiSelectedModel: (isPrimaryAgent && override?.model === undefined) ? uiSelectedModel : undefined,
-      userModel: override?.model,
+      uiSelectedModel: (isPrimaryAgent && overrideModel === undefined) ? uiSelectedModel : undefined,
+      userModel: overrideModel,
       requirement,
       availableModels,
       systemDefaultModel,
     })
     if (!resolution) {
-      if (override?.model) {
+      if (overrideModel) {
         // User explicitly configured a model but resolution failed (e.g., cold cache).
         // Honor the user's choice directly instead of falling back to hardcoded chain.
         log("[agent-registration] User-configured model not resolved, using as-is", {
           agent: agentName,
-          configuredModel: override.model,
+          configuredModel: overrideModel,
         })
-        resolution = { model: override.model, provenance: "override" as const }
+        resolution = { model: overrideModel, provenance: "override" as const }
       } else {
         resolution = getFirstFallbackModel(requirement)
       }
@@ -99,7 +111,7 @@ export function collectPendingBuiltinAgents(input: {
     if (!resolution) {
       log("[agent-registration] Agent skipped: model resolution returned no result", {
         agent: agentName,
-        configuredModel: override?.model,
+        configuredModel: overrideModel,
       })
       continue
     }

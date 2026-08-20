@@ -115,8 +115,19 @@ export function createSisyphusJuniorAgentWithOverrides(
     override = undefined
   }
 
-  const overrideModel = (override as { model?: string } | undefined)?.model
-  const model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
+// v4.19.4 compatibility: resolve user-configured model from override, supporting
+   // both legacy single-model field and the new models array (models[0] is primary).
+   let overrideModel: string | undefined = undefined
+   if (override?.model !== undefined) {
+     overrideModel = override.model
+   } else {
+     const modelsArray = override?.models
+     if (modelsArray && modelsArray.length > 0) {
+       const first = modelsArray[0]
+       overrideModel = typeof first === "string" ? first : first?.model
+     }
+   }
+   const model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
   const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append

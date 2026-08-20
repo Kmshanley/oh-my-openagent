@@ -9,14 +9,18 @@ type ResolutionEntry = {
   readonly effectiveModel: string
 }
 
+type ModelEntry = string | { model?: string }
+
 type AgentModelConfig = {
   model?: string
+  models?: ModelEntry[]
   variant?: string
   category?: string
 }
 
 type CategoryModelConfig = {
   model?: string
+  models?: ModelEntry[]
   variant?: string
 }
 
@@ -38,6 +42,7 @@ function toRosterRow(entry: ResolutionEntry): RosterRow {
 function pickAgentModelConfig(agent: AgentModelConfig): AgentModelConfig {
   const picked: AgentModelConfig = {}
   if (agent.model !== undefined) picked.model = agent.model
+  if (agent.models !== undefined) picked.models = agent.models
   if (agent.variant !== undefined) picked.variant = agent.variant
   if (agent.category !== undefined) picked.category = agent.category
   return picked
@@ -46,6 +51,7 @@ function pickAgentModelConfig(agent: AgentModelConfig): AgentModelConfig {
 function pickCategoryModelConfig(category: CategoryModelConfig): CategoryModelConfig {
   const picked: CategoryModelConfig = {}
   if (category.model !== undefined) picked.model = category.model
+  if (category.models !== undefined) picked.models = category.models
   if (category.variant !== undefined) picked.variant = category.variant
   return picked
 }

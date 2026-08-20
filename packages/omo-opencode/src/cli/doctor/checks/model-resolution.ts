@@ -8,8 +8,19 @@ import { buildModelResolutionDetails } from "./model-resolution-details"
 import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-effective-model"
 import type { AgentResolutionInfo, CategoryResolutionInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
 
-export function parseProviderModel(value: string): { providerID: string; modelID: string } | null {
-  const slashIndex = value.indexOf("/")
+function resolveOverrideModel(override?: { model?: string; models?: (string | { model?: string })[] }): string | undefined {
+  if (override?.model !== undefined) {
+    return override.model
+  }
+  const chain = override?.models
+  if (chain && chain.length > 0) {
+    const first = chain[0]
+    return typeof first === "string" ? first : first?.model
+  }
+  return undefined
+}
+
+export function parseProviderModel(value: string): { providerID: string; modelID: string } | null {  const slashIndex = value.indexOf("/")
   if (slashIndex <= 0 || slashIndex === value.length - 1) {
     return null
   }
@@ -60,7 +71,7 @@ export function getModelResolutionInfo(): ModelResolutionInfo {
 
 export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelResolutionInfo {
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => {
-    const userOverride = config.agents?.[name]?.model
+    const userOverride = resolveOverrideModel(config.agents?.[name])
     const userVariant = config.agents?.[name]?.variant
     return attachCapabilityDiagnostics({
       name,
@@ -74,7 +85,7 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
 
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
-      const userOverride = config.categories?.[name]?.model
+      const userOverride = resolveOverrideModel(config.categories?.[name])
       const userVariant = config.categories?.[name]?.variant
       return attachCapabilityDiagnostics({
         name,

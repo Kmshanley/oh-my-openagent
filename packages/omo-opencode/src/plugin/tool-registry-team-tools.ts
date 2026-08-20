@@ -4,8 +4,10 @@ import type { Managers } from "../create-managers"
 import type { PluginContext } from "./types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
-export function getSisyphusJuniorModelOverride(agentOverride?: { model?: string }): string | undefined {
-  return agentOverride?.model
+export function getSisyphusJuniorModelOverride(agentOverride?: { model?: string; models?: Array<string | { model: string }> }): string | undefined {
+  if (agentOverride?.model) return agentOverride.model
+  const first = agentOverride?.models?.[0]
+  return first ? (typeof first === "string" ? first : first.model) : undefined
 }
 
 export function createTeamModeToolsRecord(args: {

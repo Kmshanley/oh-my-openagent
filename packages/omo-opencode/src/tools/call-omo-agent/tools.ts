@@ -54,15 +54,23 @@ function resolveModelAndFallbackChain(args: {
     ? userCategories?.[agentOverride.category]?.variant
     : undefined
 
+  // v4.19.4 compatibility: prefer models array, fall back to legacy model field
+  const modelsArray = agentOverride?.models
+  const primaryModelString: string | undefined = agentOverride?.model
+    ?? (modelsArray && modelsArray.length > 0
+      ? (typeof modelsArray[0] === "string" ? modelsArray[0] : modelsArray[0]?.model)
+      : undefined)
+  const fallbackFromModels = modelsArray && modelsArray.length > 1 ? modelsArray.slice(1) : undefined
+
   let model: DelegatedModelConfig | undefined
-  if (agentOverride?.model) {
-    const normalized = parseModelString(agentOverride.model)
+  if (primaryModelString) {
+    const normalized = parseModelString(primaryModelString)
     if (normalized) {
-      model = agentOverride.variant ? { ...normalized, variant: agentOverride.variant } : normalized
+      model = agentOverride?.variant ? { ...normalized, variant: agentOverride.variant } : normalized
       log("[call_omo_agent] Resolved model override from agent config", {
         agent: subagentType,
-        model: agentOverride.model,
-        variant: agentOverride.variant,
+        model: primaryModelString,
+        variant: agentOverride?.variant,
       })
     }
   } else if (agentCategoryModel) {
@@ -94,6 +102,7 @@ function resolveModelAndFallbackChain(args: {
 
   const normalizedFallbackModels = normalizeFallbackModels(
     agentOverride?.fallback_models
+    ?? fallbackFromModels
     ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined)
   )
   const defaultProviderID = model?.providerID

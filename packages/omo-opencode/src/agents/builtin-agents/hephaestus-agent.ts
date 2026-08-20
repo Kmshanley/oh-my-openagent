@@ -7,7 +7,7 @@ import { log } from "../../shared/logger"
 import { createHephaestusAgent, isHephaestusSupportedModel } from "../hephaestus"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
-import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
+import { applyModelResolution, getFirstFallbackModel, resolveOverrideModel } from "./model-resolution"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateHephaestusConfig(input: {
@@ -41,43 +41,39 @@ export function maybeCreateHephaestusConfig(input: {
 
   if (disabledAgents.includes("hephaestus")) return undefined
 
-  const hephaestusOverride = agentOverrides["hephaestus"]
-  const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"]
-  const hasHephaestusExplicitConfig = hephaestusOverride !== undefined
+const hephaestusOverride = agentOverrides["hephaestus"]
+   const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"]
+   // v4.19.4 compatibility: resolve user-configured model from override, supporting
+   // both legacy single-model field and the new models array (models[0] is primary).
+   let overrideModel: string | undefined = undefined
+   if (hephaestusOverride?.model !== undefined) {
+     overrideModel = hephaestusOverride.model
+   } else {
+     const modelsArray = hephaestusOverride?.models
+     if (modelsArray && modelsArray.length > 0) {
+       const first = modelsArray[0]
+       overrideModel = typeof first === "string" ? first : first?.model
+     }
+   }
 
-  const hasRequiredProvider =
-    !hephaestusRequirement?.requiresProvider ||
-    hasHephaestusExplicitConfig ||
-    isFirstRunNoCache ||
-    isAnyProviderConnected(hephaestusRequirement.requiresProvider, availableModels)
+   let hephaestusResolution = applyModelResolution({
+     userModel: overrideModel,
+     requirement: hephaestusRequirement,
+     availableModels,
+     systemDefaultModel,
+   })
+   if (isFirstRunNoCache && overrideModel === undefined) {
+     hephaestusResolution = getFirstFallbackModel(hephaestusRequirement)
+   }
 
-  if (!hasRequiredProvider) {
-    log("[agent-registration] Agent skipped: required provider not connected", {
-      agent: "hephaestus",
-      requiredProvider: hephaestusRequirement?.requiresProvider,
-    })
-    return undefined
-  }
-
-  let hephaestusResolution = applyModelResolution({
-    userModel: hephaestusOverride?.model,
-    requirement: hephaestusRequirement,
-    availableModels,
-    systemDefaultModel,
-  })
-
-  if (isFirstRunNoCache && !hephaestusOverride?.model) {
-    hephaestusResolution = getFirstFallbackModel(hephaestusRequirement)
-  }
-
-  if (!hephaestusResolution) {
-    log("[agent-registration] Agent skipped: model resolution returned no result", {
-      agent: "hephaestus",
-      configuredModel: hephaestusOverride?.model,
-    })
-    return undefined
-  }
-  const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
+   if (!hephaestusResolution) {
+     log("[agent-registration] Agent skipped: model resolution returned no result", {
+       agent: "hephaestus",
+       configuredModel: overrideModel,
+     })
+     return undefined
+   }
+   const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
 
   if (!isHephaestusSupportedModel(hephaestusModel)) {
     log("[agent-registration] Agent skipped: unsupported Hephaestus model", {

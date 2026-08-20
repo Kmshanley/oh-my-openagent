@@ -10,10 +10,12 @@ import {
   resolveModelPipeline,
 } from "../shared";
 import { resolveCategoryConfig } from "./category-config-resolver";
+import { resolveOverrideModel } from "../agents/builtin-agents/model-resolution";
 
 type PrometheusOverride = Record<string, unknown> & {
   category?: string;
   model?: string;
+  models?: (string | { model?: string })[];
   reasoning?: string;
   variant?: string;
   reasoningEffort?: string;
@@ -59,7 +61,8 @@ export async function buildPrometheusAgentConfig(params: {
   });
 
   const configuredPrometheusModel =
-    params.pluginPrometheusOverride?.model ?? categoryConfig?.model;
+    resolveOverrideModel(params.pluginPrometheusOverride) ??
+    (categoryConfig ? resolveOverrideModel(categoryConfig) : undefined);
 
   const shouldUseCurrentModel = isModelInFallbackChain(
     params.currentModel,
@@ -73,8 +76,8 @@ export async function buildPrometheusAgentConfig(params: {
         : shouldUseCurrentModel
           ? params.currentModel
           : undefined,
-      userModel: params.pluginPrometheusOverride?.model,
-      categoryDefaultModel: categoryConfig?.model,
+      userModel: resolveOverrideModel(params.pluginPrometheusOverride),
+      categoryDefaultModel: categoryConfig ? resolveOverrideModel(categoryConfig) : undefined,
     },
     constraints: { availableModels },
     policy: {
