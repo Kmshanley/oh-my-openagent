@@ -20,13 +20,28 @@ export function resolveFallbackBootstrapModel(
     return eventModel
   }
 
+  const extractConfiguredModel = (record: Record<string, unknown> | undefined): string | undefined => {
+    const singular = record?.model
+    if (typeof singular === "string" && singular.length > 0) return singular
+    const models = record?.models
+    if (Array.isArray(models) && models.length > 0) {
+      const first = models[0]
+      if (typeof first === "string") return first
+      if (typeof first === "object" && first !== null) {
+        const firstModel = (first as { model?: unknown }).model
+        if (typeof firstModel === "string" && firstModel.length > 0) return firstModel
+      }
+    }
+    return undefined
+  }
+
   const agentConfigs = options.pluginConfig?.agents
   const agentConfig = options.resolvedAgent && agentConfigs
     ? agentConfigs[options.resolvedAgent as keyof typeof agentConfigs]
     : undefined
   const agentConfigRecord = agentConfig as Record<string, unknown> | undefined
-  const agentModelCandidate = agentConfigRecord?.model
-  const agentModel = typeof agentModelCandidate === "string" ? agentModelCandidate : undefined
+
+  const agentModel = extractConfiguredModel(agentConfigRecord)
   if (agentModel) {
     log(`[${HOOK_NAME}] Derived model from agent config for ${options.source}`, {
       sessionID: options.sessionID,
@@ -38,8 +53,10 @@ export function resolveFallbackBootstrapModel(
 
   const agentCategory = typeof agentConfig?.category === "string" ? agentConfig.category : undefined
   if (agentCategory) {
-    const agentCategoryModel = options.pluginConfig?.categories?.[agentCategory]?.model
-    if (typeof agentCategoryModel === "string" && agentCategoryModel.length > 0) {
+    const agentCategoryModel = extractConfiguredModel(
+      options.pluginConfig?.categories?.[agentCategory] as Record<string, unknown> | undefined,
+    )
+    if (agentCategoryModel) {
       log(`[${HOOK_NAME}] Derived model from agent category config for ${options.source}`, {
         sessionID: options.sessionID,
         agent: options.resolvedAgent,
@@ -52,9 +69,11 @@ export function resolveFallbackBootstrapModel(
 
   const sessionCategory = SessionCategoryRegistry.get(options.sessionID)
   const categoryModel = sessionCategory
-    ? options.pluginConfig?.categories?.[sessionCategory]?.model
+    ? extractConfiguredModel(
+        options.pluginConfig?.categories?.[sessionCategory] as Record<string, unknown> | undefined,
+      )
     : undefined
-  if (typeof categoryModel === "string" && categoryModel.length > 0) {
+  if (categoryModel) {
     log(`[${HOOK_NAME}] Derived model from session category config for ${options.source}`, {
       sessionID: options.sessionID,
       category: sessionCategory,
